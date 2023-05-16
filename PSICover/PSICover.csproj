@@ -8,4 +8,10 @@
     <OutDir>../bin</OutDir>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Update="styles\tool-tip.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
