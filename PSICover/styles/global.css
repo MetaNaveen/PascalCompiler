@@ -1,0 +1,17 @@
+﻿.hit {
+   background-color: lightgreen;
+}
+
+.unhit {
+   background-color: lightcoral;
+}
+
+.hit:hover {
+   cursor: pointer;
+   background-color: #53b407;
+}
+
+.unhit:hover {
+   cursor: pointer;
+   background-color: #e43708;
+}

@@ -165,7 +165,7 @@ class Analyzer {
             code[i] = code[i].Replace ('<', '\u00ab').Replace ('>', '\u00bb');
          foreach (var block in blocks) {
             bool hit = hits[block.Id] > 0;
-            string tag = $"<span class=\"{(hit ? "hit tooltip expand" : "unhit")}\" data-title=\"{(hit ? "Hit Count: " + hits[block.Id] : "")}\">";
+            string tag = $"<span class=\"{(hit ? "hit tooltip covered" : "unhit tooltip uncovered")}\" data-title=\"{(hit ? hits[block.Id] + " hits" : "Code block not hit")}\">";
             code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
             code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
          }
@@ -173,13 +173,9 @@ class Analyzer {
 
          string html = $$"""
             <html><head>
+            <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/global.css" />
             <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tool-tip.css" />
-            <style>
-            .hit { background-color:aqua; }
-            .unhit { background-color:orange; }
-            </style>
-            </head>
-            <body><pre>
+            </head><body><pre>
             {{string.Join ("\r\n", code)}}
             </pre></body></html>
             """;

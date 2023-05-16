@@ -9,6 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Update="styles\global.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="styles\tool-tip.css">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
