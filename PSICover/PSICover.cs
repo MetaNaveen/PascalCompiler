@@ -165,8 +165,8 @@ class Analyzer {
             code[i] = code[i].Replace ('<', '\u00ab').Replace ('>', '\u00bb');
          foreach (var block in blocks) {
             bool hit = hits[block.Id] > 0;
-            string tag = $"<span class=\"{(hit ? "hit" : "unhit")}\">";
-            code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
+            string tag = $"<span class=\"{(hit ? "hit" : "unhit")}\"><abbr title=\"Hit Count: {hits[block.Id]}\">";
+            code[block.ELine] = code[block.ELine].Insert (block.ECol, "</abbr></span>");
             code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
          }
          string htmlfile = $"{Dir}/HTML/{Path.GetFileNameWithoutExtension (file)}.html";
@@ -235,7 +235,7 @@ class Block {
 
 static class Program {
    public static void Main () {
-      var analyzer = new Analyzer ("P:/Bin", "PSITest.exe", "parser.dll");
+      var analyzer = new Analyzer ("D:/Work/PascalCompiler/Bin", "PSITest.exe", "parser.dll");
       analyzer.Run ();
    }
 }
