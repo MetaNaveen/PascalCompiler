@@ -151,7 +151,7 @@ class Analyzer {
    void GenerateOutputs () {
       ulong[] hits = File.ReadAllLines ($"{Dir}/hits.txt").Select (ulong.Parse).ToArray ();
       var files = mBlocks.Select (a => a.File).Distinct ().ToArray ();
-      Dictionary<string, (int covered, int total)> summary = new ();
+      Dictionary<string, (int covered, int total, double percentageCovered)> summary = new ();
       foreach (var file in files) {
          var blocks = mBlocks.Where (a => a.File == file)
                              .OrderBy (a => a.SPosition)
@@ -200,27 +200,28 @@ class Analyzer {
             """;
          html = html.Replace ("\u00ab", "&lt;").Replace ("\u00bb", "&gt;");
          File.WriteAllText (htmlfile, html);
-         summary.Add (htmlfile, (hitCount, blocks.Count));
+         summary.Add (htmlfile, (hitCount, blocks.Count, Math.Round (100.0 * hitCount / blocks.Count, 1)));
       }
       int cBlocks = mBlocks.Count, cHit = hits.Count (a => a > 0);
       double percent = Math.Round (100.0 * cHit / cBlocks, 1);
-      (int totalBlocks, int totalBlocksHit) overall = (cBlocks, cHit);
-      GenerateOutputSummary ($"{Dir}/HTML/Summary.html", summary, overall);
-      Console.WriteLine ($"Coverage: {cHit}/{cBlocks}, {percent}%");
+      (int totalBlocks, int totalBlocksHit, double percentageHit) overall = (cBlocks, cHit, percent);
+      string summaryFilepath = $"{Dir}/HTML/Summary.html";
+      GenerateOutputSummary (summaryFilepath, summary, overall);
+      Process.Start (new ProcessStartInfo (summaryFilepath) { UseShellExecute = true });
    }
 
-   void GenerateOutputSummary(string outputFilePath, Dictionary<string, (int hit, int total)> coverageDetails, (int totalBlocks, int totalBlocksHit) overall) {
+   void GenerateOutputSummary(string outputFilePath, Dictionary<string, (int hit, int total, double percentageHit)> coverageDetails, (int totalBlocks, int totalBlocksHit, double percentageHit) overall) {
+      coverageDetails = coverageDetails.OrderBy (d => d.Value.percentageHit).ToDictionary (a => a.Key, b => b.Value);
       StringBuilder tData = new ();
       foreach(var detail in coverageDetails ) {
          tData.Append($"""
          <tr>
             <td><a href="{detail.Key}">{detail.Key}</a></td>
-            <td>{detail.Value.hit}</td>
-            <td>{Math.Round (100.0 * detail.Value.hit / detail.Value.total, 1)}%</td>
+            <td>{detail.Value.hit}/{detail.Value.total}</td>
+            <td>{detail.Value.percentageHit}% {GetCoverageRating(detail.Value.percentageHit)}</td>
          </tr>
          """);
       }
-
       string html = $$""" 
       <html><head>
       <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tables.css" />
@@ -231,16 +232,12 @@ class Analyzer {
       <h2 style="margin: 0px">Overall summary</h2>
       <table>
          <tr>
-            <td>Total blocks</td>
-            <td>{{overall.totalBlocks}}</td>
-         </tr>
-         <tr>
             <td>Total blocks hit</td>
-            <td>{{overall.totalBlocksHit}}</td>
+            <td>{{overall.totalBlocksHit}}/{{overall.totalBlocks}}</td>
          </tr>
          <tr>
             <td>Total coverage percentage</td>
-            <td>{{Math.Round (100.0 * overall.totalBlocksHit / overall.totalBlocks, 1)}}%</td>
+            <td>{{overall.percentageHit}}% {{GetCoverageRating (overall.percentageHit)}}</td>
          </tr>
       </table>
       </div>
@@ -259,6 +256,13 @@ class Analyzer {
       """;
       File.WriteAllText (outputFilePath, html);
    }
+
+   string GetCoverageRating (double percent) => percent switch {
+      (>= 90.0) => "(Exemplary)",
+      (>= 75.0) => "(Commendable)",
+      (>= 60.0) => "(Acceptable)",
+      _ => "(Critical)"
+   };
 
    // Restore the DLLs and PDBs from the backups
    void RestoreBackup (string module) {
