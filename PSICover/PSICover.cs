@@ -1,5 +1,6 @@
 ﻿namespace PSICover;
 using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 
 // The CoverageAnalyzer for .Net
@@ -169,8 +170,25 @@ class Analyzer {
             bool hit = hits[block.Id] > 0;
             if (hit) hitCount++;
             string tag = $"<span class=\"{(hit ? "hit tooltip covered" : "unhit tooltip uncovered")}\" data-title=\"{(hit ? hits[block.Id] + " hits" : "Code block not hit")}\">";
-            code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
-            code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
+            if (block.ELine == block.SLine) {
+               code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
+               code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
+            } else {
+               int lastLine = block.ELine;
+               while (lastLine >= block.SLine) {
+                  string line = code[lastLine];
+                  if (!string.IsNullOrEmpty (line)) {
+                     int sIndex = 0, lIndex = line.Length - 1;
+                     while (sIndex < line.Length && char.IsWhiteSpace (line[sIndex])) sIndex++;
+                     while (lIndex >= 0 && char.IsWhiteSpace (line[lIndex])) lIndex--;
+                     if (sIndex != line.Length && lIndex != -1) {
+                        code[lastLine] = code[lastLine].Insert (lIndex + 1, "</span>");
+                        code[lastLine] = code[lastLine].Insert (sIndex, tag);
+                     }
+                  }
+                  lastLine--;
+               }
+            }
          }
          string htmlfile = $"{Dir}/HTML/{Path.GetFileNameWithoutExtension (file)}.html";
          string html = $$"""
@@ -192,15 +210,15 @@ class Analyzer {
    }
 
    void GenerateOutputSummary(string outputFilePath, Dictionary<string, (int hit, int total)> coverageDetails, (int totalBlocks, int totalBlocksHit) overall) {
-      string tData = "";
+      StringBuilder tData = new ();
       foreach(var detail in coverageDetails ) {
-         tData += $"""
+         tData.Append($"""
          <tr>
             <td><a href="{detail.Key}">{detail.Key}</a></td>
             <td>{detail.Value.hit}</td>
             <td>{Math.Round (100.0 * detail.Value.hit / detail.Value.total, 1)}%</td>
          </tr>
-         """;
+         """);
       }
 
       string html = $$""" 
@@ -214,15 +232,15 @@ class Analyzer {
       <table>
          <tr>
             <td>Total blocks</td>
-            <td>: {{overall.totalBlocks}}</td>
+            <td>{{overall.totalBlocks}}</td>
          </tr>
          <tr>
             <td>Total blocks hit</td>
-            <td>: {{overall.totalBlocksHit}}</td>
+            <td>{{overall.totalBlocksHit}}</td>
          </tr>
          <tr>
             <td>Total coverage percentage</td>
-            <td>: {{Math.Round (100.0 * overall.totalBlocksHit / overall.totalBlocks, 1)}}%</td>
+            <td>{{Math.Round (100.0 * overall.totalBlocksHit / overall.totalBlocks, 1)}}%</td>
          </tr>
       </table>
       </div>
