@@ -150,6 +150,7 @@ class Analyzer {
    void GenerateOutputs () {
       ulong[] hits = File.ReadAllLines ($"{Dir}/hits.txt").Select (ulong.Parse).ToArray ();
       var files = mBlocks.Select (a => a.File).Distinct ().ToArray ();
+      Dictionary<string, (int covered, int total)> summary = new ();
       foreach (var file in files) {
          var blocks = mBlocks.Where (a => a.File == file)
                              .OrderBy (a => a.SPosition)
@@ -163,28 +164,82 @@ class Analyzer {
          var code = File.ReadAllLines (file);
          for (int i = 0; i < code.Length; i++)
             code[i] = code[i].Replace ('<', '\u00ab').Replace ('>', '\u00bb');
+         int hitCount = 0;
          foreach (var block in blocks) {
             bool hit = hits[block.Id] > 0;
+            if (hit) hitCount++;
             string tag = $"<span class=\"{(hit ? "hit tooltip covered" : "unhit tooltip uncovered")}\" data-title=\"{(hit ? hits[block.Id] + " hits" : "Code block not hit")}\">";
             code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
             code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
          }
          string htmlfile = $"{Dir}/HTML/{Path.GetFileNameWithoutExtension (file)}.html";
-
          string html = $$"""
             <html><head>
-            <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/global.css" />
-            <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tool-tip.css" />
+            <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tooltip.css" />
             </head><body><pre>
             {{string.Join ("\r\n", code)}}
             </pre></body></html>
             """;
          html = html.Replace ("\u00ab", "&lt;").Replace ("\u00bb", "&gt;");
          File.WriteAllText (htmlfile, html);
+         summary.Add (htmlfile, (hitCount, blocks.Count));
       }
       int cBlocks = mBlocks.Count, cHit = hits.Count (a => a > 0);
       double percent = Math.Round (100.0 * cHit / cBlocks, 1);
+      (int totalBlocks, int totalBlocksHit) overall = (cBlocks, cHit);
+      GenerateOutputSummary ($"{Dir}/HTML/Summary.html", summary, overall);
       Console.WriteLine ($"Coverage: {cHit}/{cBlocks}, {percent}%");
+   }
+
+   void GenerateOutputSummary(string outputFilePath, Dictionary<string, (int hit, int total)> coverageDetails, (int totalBlocks, int totalBlocksHit) overall) {
+      string tData = "";
+      foreach(var detail in coverageDetails ) {
+         tData += $"""
+         <tr>
+            <td><a href="{detail.Key}">{detail.Key}</a></td>
+            <td>{detail.Value.hit}</td>
+            <td>{Math.Round (100.0 * detail.Value.hit / detail.Value.total, 1)}%</td>
+         </tr>
+         """;
+      }
+
+      string html = $$""" 
+      <html><head>
+      <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tables.css" />
+      <style>a { color: blue; }</style>
+      </head>
+      <body><pre>
+      <div>
+      <h2 style="margin: 0px">Overall summary</h2>
+      <table>
+         <tr>
+            <td>Total blocks</td>
+            <td>: {{overall.totalBlocks}}</td>
+         </tr>
+         <tr>
+            <td>Total blocks hit</td>
+            <td>: {{overall.totalBlocksHit}}</td>
+         </tr>
+         <tr>
+            <td>Total coverage percentage</td>
+            <td>: {{Math.Round (100.0 * overall.totalBlocksHit / overall.totalBlocks, 1)}}%</td>
+         </tr>
+      </table>
+      </div>
+      <div>
+      <h2 style="margin: 0px">File specific summary</h2>
+      <table>
+         <tr>
+            <th>Filename</th>
+            <th>Blocks hit</th>
+            <th>Coverage percentage</th>
+         </tr>
+         {{tData}}
+      </table>
+      </div>
+      </pre></body></html>
+      """;
+      File.WriteAllText (outputFilePath, html);
    }
 
    // Restore the DLLs and PDBs from the backups
