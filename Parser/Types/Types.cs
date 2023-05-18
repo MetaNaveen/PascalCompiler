@@ -34,8 +34,26 @@ public class SymTable {
             foreach (var mi in type.GetMethods ()) {
                if (mi.Name.StartsWith ("get_") || mi.Name.StartsWith ("set_")) continue;
                if (!mi.IsStatic) continue;
-               var args = mi.GetParameters ().Select (a => new NVarDecl (new Token (a.Name!), mMap[a.ParameterType])).ToArray (); ;
-               mRoot.Entries.Add (mi.Name, new NFnDecl (new Token (mi.Name), args, mMap[mi.ReturnType], null));
+               // TESTING ONLY: Indentation is messed up for testing the multiline block and sameline with multiple blocks
+               var args = mi.GetParameters ().Select (a => new NVarDecl (
+                     new Token (
+                        a.Name!
+                        ), 
+                     mMap[a.ParameterType]
+                     )
+                  )
+                  .ToArray ();
+               mRoot
+
+                  .Entries
+                  
+                  .Add (mi.Name, 
+                     new NFnDecl (
+                        new Token (mi.Name), 
+                        args, 
+                        mMap[mi.ReturnType], 
+                        null)
+                     );           
             }
          }
          return mRoot;

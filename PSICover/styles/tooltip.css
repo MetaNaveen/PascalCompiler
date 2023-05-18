@@ -1,23 +1,4 @@
-﻿/* Blocks Hit/Unhit */
-.hit {
-   background-color: lightgreen;
-}
-
-.unhit {
-   background-color: lightcoral;
-}
-
-.hit:hover {
-   cursor: pointer;
-   background-color: #53b407;
-}
-
-.unhit:hover {
-   cursor: pointer;
-   background-color: #e43708;
-}
-
-/* Tooltip */
+﻿/* Tooltip */
 .tooltip {
    position: relative;
 }
@@ -68,4 +49,31 @@
 .tooltip.uncovered:hover::before,
 .tooltip.uncovered:hover::after {
    opacity: 1;
+}
+
+/* Blocks Hit/Unhit */
+.hit {
+   background-color: lightgreen;
+}
+
+.unhit {
+   background-color: lightcoral;
+}
+
+.hit:hover {
+   cursor: pointer;
+   background-color: #53b407;
+}
+
+.unhit:hover {
+   cursor: pointer;
+   background-color: #e43708;
+}
+
+.tooltip:hover > .hit {
+   background-color: #53b407;
+}
+
+.tooltip:hover > .unhit {
+   background-color: #e43708;
 }

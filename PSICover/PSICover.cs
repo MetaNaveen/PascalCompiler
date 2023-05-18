@@ -169,19 +169,29 @@ class Analyzer {
          foreach (var block in blocks) {
             bool hit = hits[block.Id] > 0;
             if (hit) hitCount++;
-            string tag = $"<span class=\"{(hit ? "hit tooltip covered" : "unhit tooltip uncovered")}\" data-title=\"{(hit ? hits[block.Id] + " hits" : "Code block not hit")}\">";
-            int lastLine = block.ELine;
-            while (lastLine >= block.SLine) {
-               if (!string.IsNullOrEmpty (code[lastLine])) {
-                  int sIndex = code[lastLine].TakeWhile (char.IsWhiteSpace).Count ();
-                  if (sIndex != code[lastLine].Length) {
-                     int lIndex = code[lastLine].Length - 1;
-                     while (lIndex >= sIndex && char.IsWhiteSpace (code[lastLine][lIndex])) lIndex--;
-                     code[lastLine] = code[lastLine].Insert (lIndex + 1, "</span>");
-                     code[lastLine] = code[lastLine].Insert (sIndex, tag);
+            if (block.SLine == block.ELine) { // For same line blocks
+               string tag = $"<span class=\"{(hit ? "hit tooltip covered" : "unhit tooltip uncovered")}\" data-title=\"{(hit ? hits[block.Id] + " hits" : "Code block not hit")}\">";
+               code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
+               code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
+            } else { // for multi line blocks w/wo other blocks on same line
+               string blockTag = $"<span class=\"tooltip covered\" data-title=\"{(hit ? hits[block.Id] + " hits" : "Code block not hit")}\"><span class=\"{(hit ? "hit" : "unhit")}\">";
+               string insideBlockTag = $"<span class=\"{(hit ? "hit" : "unhit")}\">";
+               code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span></span>");
+               code[block.ELine] = code[block.ELine].Insert (GetFirstNonWhitespaceIndex (code[block.ELine]), insideBlockTag);
+               int lastLine = block.ELine - 1;
+               while (lastLine > block.SLine) {
+                  if (!string.IsNullOrEmpty (code[lastLine])) {
+                     int sIndex = GetFirstNonWhitespaceIndex (code[lastLine]);
+                     if (sIndex != code[lastLine].Length) {
+                        int lIndex = GetLastNonWhitespaceIndex (code[lastLine]);
+                        code[lastLine] = code[lastLine].Insert (lIndex + 1, "</span>");
+                        code[lastLine] = code[lastLine].Insert (sIndex, insideBlockTag);
+                     }
                   }
+                  lastLine--;
                }
-               lastLine--;
+               code[block.SLine] = code[block.SLine].Insert (GetLastNonWhitespaceIndex (code[block.SLine]) + 1, "</span>");
+               code[block.SLine] = code[block.SLine].Insert (block.SCol, blockTag);
             }
          }
          string htmlfile = $"{Dir}/HTML/{Path.GetFileNameWithoutExtension (file)}.html";
@@ -202,6 +212,16 @@ class Analyzer {
       string summaryFilepath = $"{Dir}/HTML/Summary.html";
       GenerateOutputSummary (summaryFilepath, summary, overall);
       Process.Start (new ProcessStartInfo (summaryFilepath) { UseShellExecute = true });
+   }
+
+   int GetFirstNonWhitespaceIndex(string str) {
+      return str.TakeWhile (char.IsWhiteSpace).Count ();
+   }
+
+   int GetLastNonWhitespaceIndex (string str) {
+      int lIndex = str.Length - 1;
+      while (lIndex >= 0 && char.IsWhiteSpace (str[lIndex])) lIndex--;
+      return lIndex;
    }
 
    void GenerateOutputSummary(string outputFilePath, Dictionary<string, (string csFilename, int hit, int total, double percentageHit)> coverageDetails, (int totalBlocks, int totalBlocksHit, double percentageHit) overall) {
