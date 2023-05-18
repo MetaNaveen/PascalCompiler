@@ -151,7 +151,7 @@ class Analyzer {
    void GenerateOutputs () {
       ulong[] hits = File.ReadAllLines ($"{Dir}/hits.txt").Select (ulong.Parse).ToArray ();
       var files = mBlocks.Select (a => a.File).Distinct ().ToArray ();
-      Dictionary<string, (int covered, int total, double percentageCovered)> summary = new ();
+      Dictionary<string, (string csFilename, int covered, int total, double percentageCovered)> summary = new ();
       foreach (var file in files) {
          var blocks = mBlocks.Where (a => a.File == file)
                              .OrderBy (a => a.SPosition)
@@ -170,29 +170,23 @@ class Analyzer {
             bool hit = hits[block.Id] > 0;
             if (hit) hitCount++;
             string tag = $"<span class=\"{(hit ? "hit tooltip covered" : "unhit tooltip uncovered")}\" data-title=\"{(hit ? hits[block.Id] + " hits" : "Code block not hit")}\">";
-            if (block.ELine == block.SLine) {
-               code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
-               code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
-            } else {
-               int lastLine = block.ELine;
-               while (lastLine >= block.SLine) {
-                  string line = code[lastLine];
-                  if (!string.IsNullOrEmpty (line)) {
-                     int sIndex = 0, lIndex = line.Length - 1;
-                     while (sIndex < line.Length && char.IsWhiteSpace (line[sIndex])) sIndex++;
-                     while (lIndex >= 0 && char.IsWhiteSpace (line[lIndex])) lIndex--;
-                     if (sIndex != line.Length && lIndex != -1) {
-                        code[lastLine] = code[lastLine].Insert (lIndex + 1, "</span>");
-                        code[lastLine] = code[lastLine].Insert (sIndex, tag);
-                     }
+            int lastLine = block.ELine;
+            while (lastLine >= block.SLine) {
+               if (!string.IsNullOrEmpty (code[lastLine])) {
+                  int sIndex = code[lastLine].TakeWhile (char.IsWhiteSpace).Count ();
+                  if (sIndex != code[lastLine].Length) {
+                     int lIndex = code[lastLine].Length - 1;
+                     while (lIndex >= sIndex && char.IsWhiteSpace (code[lastLine][lIndex])) lIndex--;
+                     code[lastLine] = code[lastLine].Insert (lIndex + 1, "</span>");
+                     code[lastLine] = code[lastLine].Insert (sIndex, tag);
                   }
-                  lastLine--;
                }
+               lastLine--;
             }
          }
          string htmlfile = $"{Dir}/HTML/{Path.GetFileNameWithoutExtension (file)}.html";
          string html = $$"""
-            <html><head>
+            <html><head><title>{{Path.GetFileName(file)}}</title>
             <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tooltip.css" />
             </head><body><pre>
             {{string.Join ("\r\n", code)}}
@@ -200,7 +194,7 @@ class Analyzer {
             """;
          html = html.Replace ("\u00ab", "&lt;").Replace ("\u00bb", "&gt;");
          File.WriteAllText (htmlfile, html);
-         summary.Add (htmlfile, (hitCount, blocks.Count, Math.Round (100.0 * hitCount / blocks.Count, 1)));
+         summary.Add (htmlfile, (Path.GetFullPath (file), hitCount, blocks.Count, Math.Round (100.0 * hitCount / blocks.Count, 1)));
       }
       int cBlocks = mBlocks.Count, cHit = hits.Count (a => a > 0);
       double percent = Math.Round (100.0 * cHit / cBlocks, 1);
@@ -210,20 +204,9 @@ class Analyzer {
       Process.Start (new ProcessStartInfo (summaryFilepath) { UseShellExecute = true });
    }
 
-   void GenerateOutputSummary(string outputFilePath, Dictionary<string, (int hit, int total, double percentageHit)> coverageDetails, (int totalBlocks, int totalBlocksHit, double percentageHit) overall) {
-      coverageDetails = coverageDetails.OrderBy (d => d.Value.percentageHit).ToDictionary (a => a.Key, b => b.Value);
-      StringBuilder tData = new ();
-      foreach(var detail in coverageDetails ) {
-         tData.Append($"""
-         <tr>
-            <td><a href="{detail.Key}">{detail.Key}</a></td>
-            <td>{detail.Value.hit}/{detail.Value.total}</td>
-            <td>{detail.Value.percentageHit}% {GetCoverageRating(detail.Value.percentageHit)}</td>
-         </tr>
-         """);
-      }
+   void GenerateOutputSummary(string outputFilePath, Dictionary<string, (string csFilename, int hit, int total, double percentageHit)> coverageDetails, (int totalBlocks, int totalBlocksHit, double percentageHit) overall) {
       string html = $$""" 
-      <html><head>
+      <html><head><title>Coverage Summary</title>
       <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tables.css" />
       <style>a { color: blue; }</style>
       </head>
@@ -249,7 +232,11 @@ class Analyzer {
             <th>Blocks hit</th>
             <th>Coverage percentage</th>
          </tr>
-         {{tData}}
+         {{string.Join("\r\n", coverageDetails.OrderBy (d => d.Value.percentageHit).Select(detail => $"""
+         <tr><td><a href="{detail.Key}">{detail.Value.csFilename}</a></td>
+            <td>{detail.Value.hit}/{detail.Value.total}</td>
+            <td>{detail.Value.percentageHit}% {GetCoverageRating (detail.Value.percentageHit)}</td></tr>
+         """))}}
       </table>
       </div>
       </pre></body></html>
