@@ -35,20 +35,15 @@
    white-space: nowrap;
 }
 
-.tooltip.covered::before {
+.tooltip.animate::before {
    transform: scale(.5,.5);
    transition: all .3s ease-in-out;
 }
 
-.tooltip.covered:hover::before,
-.tooltip.covered:hover::after {
+.tooltip.animate:hover::before,
+.tooltip.animate:hover::after {
    opacity: 1;
    transform: scale(1,1);
-}
-
-.tooltip.uncovered:hover::before,
-.tooltip.uncovered:hover::after {
-   opacity: 1;
 }
 
 /* Blocks Hit/Unhit */

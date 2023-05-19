@@ -3,6 +3,10 @@
    border-spacing: 0px;
 }
 
+td {
+   word-break: break-all;
+}
+
 td:first-child {
    background-color: lightgray;
 }

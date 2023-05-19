@@ -151,7 +151,7 @@ class Analyzer {
    void GenerateOutputs () {
       ulong[] hits = File.ReadAllLines ($"{Dir}/hits.txt").Select (ulong.Parse).ToArray ();
       var files = mBlocks.Select (a => a.File).Distinct ().ToArray ();
-      Dictionary<string, (string csFilename, int covered, int total, double percentageCovered)> summary = new ();
+      List<(string htmlFile, string csFilename, int covered, int total, double percentageCovered)> summary = new ();
       foreach (var file in files) {
          var blocks = mBlocks.Where (a => a.File == file)
                              .OrderBy (a => a.SPosition)
@@ -169,34 +169,40 @@ class Analyzer {
          foreach (var block in blocks) {
             bool hit = hits[block.Id] > 0;
             if (hit) hitCount++;
-            if (block.SLine == block.ELine) { // For same line blocks
-               string tag = $"<span class=\"{(hit ? "hit tooltip covered" : "unhit tooltip uncovered")}\" data-title=\"{(hit ? hits[block.Id] + " hits" : "Code block not hit")}\">";
-               code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
-               code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
-            } else { // for multi line blocks w/wo other blocks on same line
-               string blockTag = $"<span class=\"tooltip covered\" data-title=\"{(hit ? hits[block.Id] + " hits" : "Code block not hit")}\"><span class=\"{(hit ? "hit" : "unhit")}\">";
-               string insideBlockTag = $"<span class=\"{(hit ? "hit" : "unhit")}\">";
-               code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span></span>");
-               code[block.ELine] = code[block.ELine].Insert (GetFirstNonWhitespaceIndex (code[block.ELine]), insideBlockTag);
-               int lastLine = block.ELine - 1;
-               while (lastLine > block.SLine) {
+            // html elements - single line block
+            string tooltipTitle = $"{(hit ? hits[block.Id] + (hits[block.Id] > 1 ? " hits" : " hit") : "Code block not hit")}";
+            string titleAttrib = $"data-title=\"{tooltipTitle}\"";
+            string samelineTag = $"<span class=\"{(hit ? "hit tooltip animate" : "unhit tooltip animate")}\" {titleAttrib}>";
+            string closeTag = "</span>";
+            // html elements - multi line block
+            string insideMultilineTag = $"<span class=\"{(hit ? "hit" : "unhit")}\">";
+            string multilineTag = $"<span class=\"tooltip animate\" {titleAttrib}>{insideMultilineTag}";
+            // adding html tags to all the blocks
+            for (int lastLine = block.ELine; lastLine >= block.SLine; lastLine--) {
+               if (block.SLine == block.ELine) { // for same line blocks
+                  code[block.ELine] = code[block.ELine].Insert (block.ECol, closeTag);
+                  code[block.SLine] = code[block.SLine].Insert (block.SCol, samelineTag);
+               } else if (lastLine == block.ELine) { // for last line's column of multiline block
+                  code[lastLine] = code[lastLine].Insert (block.ECol, closeTag + closeTag);
+                  code[lastLine] = code[lastLine].Insert (FirstValidIdx (code[lastLine]), insideMultilineTag);
+               } else if (lastLine == block.SLine) { // for first line's column of multiline block
+                  code[lastLine] = code[lastLine].Insert (LastValidIdx (code[lastLine]), closeTag);
+                  code[lastLine] = code[lastLine].Insert (block.SCol, multilineTag);
+               } else { // for multi line blocks, w/wo other blocks on same line
                   if (!string.IsNullOrEmpty (code[lastLine])) {
-                     int sIndex = GetFirstNonWhitespaceIndex (code[lastLine]);
-                     if (sIndex != code[lastLine].Length) {
-                        int lIndex = GetLastNonWhitespaceIndex (code[lastLine]);
-                        code[lastLine] = code[lastLine].Insert (lIndex + 1, "</span>");
-                        code[lastLine] = code[lastLine].Insert (sIndex, insideBlockTag);
+                     int sCol = FirstValidIdx (code[lastLine]);
+                     if (sCol != code[lastLine].Length) {
+                        int lCol = LastValidIdx (code[lastLine]);
+                        code[lastLine] = code[lastLine].Insert (lCol, closeTag);
+                        code[lastLine] = code[lastLine].Insert (sCol, insideMultilineTag);
                      }
                   }
-                  lastLine--;
                }
-               code[block.SLine] = code[block.SLine].Insert (GetLastNonWhitespaceIndex (code[block.SLine]) + 1, "</span>");
-               code[block.SLine] = code[block.SLine].Insert (block.SCol, blockTag);
             }
          }
          string htmlfile = $"{Dir}/HTML/{Path.GetFileNameWithoutExtension (file)}.html";
          string html = $$"""
-            <html><head><title>{{Path.GetFileName(file)}}</title>
+            <html><head><title>{{Path.GetFileName (file)}}</title>
             <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tooltip.css" />
             </head><body><pre>
             {{string.Join ("\r\n", code)}}
@@ -204,7 +210,7 @@ class Analyzer {
             """;
          html = html.Replace ("\u00ab", "&lt;").Replace ("\u00bb", "&gt;");
          File.WriteAllText (htmlfile, html);
-         summary.Add (htmlfile, (Path.GetFullPath (file), hitCount, blocks.Count, Math.Round (100.0 * hitCount / blocks.Count, 1)));
+         summary.Add ((htmlfile, Path.GetFullPath (file), hitCount, blocks.Count, Math.Round (100.0 * hitCount / blocks.Count, 1)));
       }
       int cBlocks = mBlocks.Count, cHit = hits.Count (a => a > 0);
       double percent = Math.Round (100.0 * cHit / cBlocks, 1);
@@ -212,19 +218,13 @@ class Analyzer {
       string summaryFilepath = $"{Dir}/HTML/Summary.html";
       GenerateOutputSummary (summaryFilepath, summary, overall);
       Process.Start (new ProcessStartInfo (summaryFilepath) { UseShellExecute = true });
+
+      int FirstValidIdx (string str) => str.TakeWhile (char.IsWhiteSpace).Count ();
+
+      int LastValidIdx (string str) => str.Length - str.Reverse ().TakeWhile (char.IsWhiteSpace).Count ();
    }
 
-   int GetFirstNonWhitespaceIndex(string str) {
-      return str.TakeWhile (char.IsWhiteSpace).Count ();
-   }
-
-   int GetLastNonWhitespaceIndex (string str) {
-      int lIndex = str.Length - 1;
-      while (lIndex >= 0 && char.IsWhiteSpace (str[lIndex])) lIndex--;
-      return lIndex;
-   }
-
-   void GenerateOutputSummary(string outputFilePath, Dictionary<string, (string csFilename, int hit, int total, double percentageHit)> coverageDetails, (int totalBlocks, int totalBlocksHit, double percentageHit) overall) {
+   void GenerateOutputSummary(string outputFilePath, List<(string htmlFile, string csFilename, int hit, int total, double percentageHit)> coverageDetails, (int totalBlocks, int totalBlocksHit, double percentageHit) overall) {
       string html = $$""" 
       <html><head><title>Coverage Summary</title>
       <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tables.css" />
@@ -240,7 +240,7 @@ class Analyzer {
          </tr>
          <tr>
             <td>Total coverage percentage</td>
-            <td>{{overall.percentageHit}}% {{GetCoverageRating (overall.percentageHit)}}</td>
+            <td>{{overall.percentageHit}} % {{GetCoverageRating (overall.percentageHit)}}</td>
          </tr>
       </table>
       </div>
@@ -252,10 +252,10 @@ class Analyzer {
             <th>Blocks hit</th>
             <th>Coverage percentage</th>
          </tr>
-         {{string.Join("\r\n", coverageDetails.OrderBy (d => d.Value.percentageHit).Select(detail => $"""
-         <tr><td><a href="{detail.Key}">{detail.Value.csFilename}</a></td>
-            <td>{detail.Value.hit}/{detail.Value.total}</td>
-            <td>{detail.Value.percentageHit}% {GetCoverageRating (detail.Value.percentageHit)}</td></tr>
+         {{string.Join("\r\n", coverageDetails.OrderBy (d => d.percentageHit).Select(detail => $"""
+         <tr><td><a href="{detail.htmlFile}">{detail.csFilename}</a></td>
+            <td>{detail.hit}/{detail.total}</td>
+            <td>{detail.percentageHit} % {GetCoverageRating (detail.percentageHit)}</td></tr>
          """))}}
       </table>
       </div>
