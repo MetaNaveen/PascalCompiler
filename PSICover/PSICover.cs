@@ -161,40 +161,42 @@ class Analyzer {
             if (blocks[i - 1].Contains (blocks[i]))
                blocks.RemoveAt (i - 1);
          blocks.Reverse ();
-
          var code = File.ReadAllLines (file);
          for (int i = 0; i < code.Length; i++)
             code[i] = code[i].Replace ('<', '\u00ab').Replace ('>', '\u00bb');
-         int hitCount = 0;
+         int cHits = 0;
          foreach (var block in blocks) {
             bool hit = hits[block.Id] > 0;
-            if (hit) hitCount++;
-            // html elements - single line block
-            string tooltipTitle = $"{(hit ? hits[block.Id] + (hits[block.Id] > 1 ? " hits" : " hit") : "Code block not hit")}";
-            string titleAttrib = $"data-title=\"{tooltipTitle}\"";
-            string samelineTag = $"<span class=\"{(hit ? "hit tooltip animate" : "unhit tooltip animate")}\" {titleAttrib}>";
-            string closeTag = "</span>";
-            // html elements - multi line block
-            string insideMultilineTag = $"<span class=\"{(hit ? "hit" : "unhit")}\">";
-            string multilineTag = $"<span class=\"tooltip animate\" {titleAttrib}>{insideMultilineTag}";
-            // adding html tags to all the blocks
-            for (int lastLine = block.ELine; lastLine >= block.SLine; lastLine--) {
+            string toolTipTag = "tooltip animate", closeTag = "</span>", tooltipTitle, samelineTag, insideMultilineTag, multilineTag;
+            if (hit) {
+               cHits++;
+               tooltipTitle = $"data-title=\"{hits[block.Id]} {(hits[block.Id] > 1 ? " hits" : " hit")}\"";
+               samelineTag = $"<span class=\"hit {toolTipTag}\" {tooltipTitle}>";
+               insideMultilineTag = $"<span class=\"hit\">";
+               multilineTag = $"<span class=\"{toolTipTag}\" {tooltipTitle}>{insideMultilineTag}";
+            } else {
+               tooltipTitle = $"data-title=\"Code block not hit\"";
+               samelineTag = $"<span class=\"unhit {toolTipTag}\" {tooltipTitle}>";
+               insideMultilineTag = $"<span class=\"unhit\">";
+               multilineTag = $"<span class=\"{toolTipTag}\" {tooltipTitle}>{insideMultilineTag}";
+            }
+            for (int i = block.ELine; i >= block.SLine; i--) { // adding html tags to all the blocks
                if (block.SLine == block.ELine) { // for same line blocks
-                  code[block.ELine] = code[block.ELine].Insert (block.ECol, closeTag);
-                  code[block.SLine] = code[block.SLine].Insert (block.SCol, samelineTag);
-               } else if (lastLine == block.ELine) { // for last line's column of multiline block
-                  code[lastLine] = code[lastLine].Insert (block.ECol, closeTag + closeTag);
-                  code[lastLine] = code[lastLine].Insert (FirstValidIdx (code[lastLine]), insideMultilineTag);
-               } else if (lastLine == block.SLine) { // for first line's column of multiline block
-                  code[lastLine] = code[lastLine].Insert (LastValidIdx (code[lastLine]), closeTag);
-                  code[lastLine] = code[lastLine].Insert (block.SCol, multilineTag);
+                  code[i] = code[i].Insert (block.ECol, closeTag);
+                  code[i] = code[i].Insert (block.SCol, samelineTag);
+               } else if (i == block.ELine) { // for last line's column of multiline block
+                  code[i] = code[i].Insert (block.ECol, closeTag + closeTag);
+                  code[i] = code[i].Insert (FirstValidIdx (code[i]), insideMultilineTag);
+               } else if (i == block.SLine) { // for first line's column of multiline block
+                  code[i] = code[i].Insert (LastValidIdx (code[i]), closeTag);
+                  code[i] = code[i].Insert (block.SCol, multilineTag);
                } else { // for multi line blocks, w/wo other blocks on same line
-                  if (!string.IsNullOrEmpty (code[lastLine])) {
-                     int sCol = FirstValidIdx (code[lastLine]);
-                     if (sCol != code[lastLine].Length) {
-                        int lCol = LastValidIdx (code[lastLine]);
-                        code[lastLine] = code[lastLine].Insert (lCol, closeTag);
-                        code[lastLine] = code[lastLine].Insert (sCol, insideMultilineTag);
+                  if (!string.IsNullOrEmpty (code[i])) {
+                     int sCol = FirstValidIdx (code[i]);
+                     if (sCol != code[i].Length) {
+                        int lCol = LastValidIdx (code[i]);
+                        code[i] = code[i].Insert (lCol, closeTag);
+                        code[i] = code[i].Insert (sCol, insideMultilineTag);
                      }
                   }
                }
@@ -210,7 +212,7 @@ class Analyzer {
             """;
          html = html.Replace ("\u00ab", "&lt;").Replace ("\u00bb", "&gt;");
          File.WriteAllText (htmlfile, html);
-         summary.Add ((htmlfile, Path.GetFullPath (file), hitCount, blocks.Count, Math.Round (100.0 * hitCount / blocks.Count, 1)));
+         summary.Add ((htmlfile, Path.GetFullPath (file), cHits, blocks.Count, Math.Round (100.0 * cHits / blocks.Count, 1)));
       }
       int cBlocks = mBlocks.Count, cHit = hits.Count (a => a > 0);
       double percent = Math.Round (100.0 * cHit / cBlocks, 1);
@@ -220,7 +222,6 @@ class Analyzer {
       Process.Start (new ProcessStartInfo (summaryFilepath) { UseShellExecute = true });
 
       int FirstValidIdx (string str) => str.TakeWhile (char.IsWhiteSpace).Count ();
-
       int LastValidIdx (string str) => str.Length - str.Reverse ().TakeWhile (char.IsWhiteSpace).Count ();
    }
 
