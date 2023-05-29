@@ -1,5 +1,6 @@
 ﻿namespace PSICover;
 using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 
 // The CoverageAnalyzer for .Net
@@ -150,6 +151,7 @@ class Analyzer {
    void GenerateOutputs () {
       ulong[] hits = File.ReadAllLines ($"{Dir}/hits.txt").Select (ulong.Parse).ToArray ();
       var files = mBlocks.Select (a => a.File).Distinct ().ToArray ();
+      List<(string htmlFile, string csFilename, int covered, int total, double percentageCovered)> summary = new ();
       foreach (var file in files) {
          var blocks = mBlocks.Where (a => a.File == file)
                              .OrderBy (a => a.SPosition)
@@ -159,34 +161,116 @@ class Analyzer {
             if (blocks[i - 1].Contains (blocks[i]))
                blocks.RemoveAt (i - 1);
          blocks.Reverse ();
-
          var code = File.ReadAllLines (file);
          for (int i = 0; i < code.Length; i++)
             code[i] = code[i].Replace ('<', '\u00ab').Replace ('>', '\u00bb');
+         int cHits = 0;
          foreach (var block in blocks) {
             bool hit = hits[block.Id] > 0;
-            string tag = $"<span class=\"{(hit ? "hit" : "unhit")}\">";
-            code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
-            code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
+            string toolTipTag = "tooltip animate", closeTag = "</span>", tooltipTitle, samelineTag, insideMultilineTag, multilineTag;
+            if (hit) {
+               cHits++;
+               tooltipTitle = $"data-title=\"{hits[block.Id]} {(hits[block.Id] > 1 ? " hits" : " hit")}\"";
+               samelineTag = $"<span class=\"hit {toolTipTag}\" {tooltipTitle}>";
+               insideMultilineTag = $"<span class=\"hit\">";
+               multilineTag = $"<span class=\"{toolTipTag}\" {tooltipTitle}>{insideMultilineTag}";
+            } else {
+               tooltipTitle = $"data-title=\"Code block not hit\"";
+               samelineTag = $"<span class=\"unhit {toolTipTag}\" {tooltipTitle}>";
+               insideMultilineTag = $"<span class=\"unhit\">";
+               multilineTag = $"<span class=\"{toolTipTag}\" {tooltipTitle}>{insideMultilineTag}";
+            }
+            for (int i = block.ELine; i >= block.SLine; i--) { // adding html tags to all the blocks
+               if (block.SLine == block.ELine) { // for same line blocks
+                  code[i] = code[i].Insert (block.ECol, closeTag);
+                  code[i] = code[i].Insert (block.SCol, samelineTag);
+               } else if (i == block.ELine) { // for last line's column of multiline block
+                  code[i] = code[i].Insert (block.ECol, closeTag + closeTag);
+                  code[i] = code[i].Insert (FirstValidIdx (code[i]), insideMultilineTag);
+               } else if (i == block.SLine) { // for first line's column of multiline block
+                  code[i] = code[i].Insert (LastValidIdx (code[i]), closeTag);
+                  code[i] = code[i].Insert (block.SCol, multilineTag);
+               } else { // for multi line blocks, w/wo other blocks on same line
+                  if (!string.IsNullOrEmpty (code[i])) {
+                     int sCol = FirstValidIdx (code[i]);
+                     if (sCol != code[i].Length) {
+                        int lCol = LastValidIdx (code[i]);
+                        code[i] = code[i].Insert (lCol, closeTag);
+                        code[i] = code[i].Insert (sCol, insideMultilineTag);
+                     }
+                  }
+               }
+            }
          }
          string htmlfile = $"{Dir}/HTML/{Path.GetFileNameWithoutExtension (file)}.html";
-
          string html = $$"""
-            <html><head><style>
-            .hit { background-color:aqua; }
-            .unhit { background-color:orange; }
-            </style></head>
-            <body><pre>
+            <html><head><title>{{Path.GetFileName (file)}}</title>
+            <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tooltip.css" />
+            </head><body><pre>
             {{string.Join ("\r\n", code)}}
             </pre></body></html>
             """;
          html = html.Replace ("\u00ab", "&lt;").Replace ("\u00bb", "&gt;");
          File.WriteAllText (htmlfile, html);
+         summary.Add ((htmlfile, Path.GetFullPath (file), cHits, blocks.Count, Math.Round (100.0 * cHits / blocks.Count, 1)));
       }
       int cBlocks = mBlocks.Count, cHit = hits.Count (a => a > 0);
       double percent = Math.Round (100.0 * cHit / cBlocks, 1);
-      Console.WriteLine ($"Coverage: {cHit}/{cBlocks}, {percent}%");
+      (int totalBlocks, int totalBlocksHit, double percentageHit) overall = (cBlocks, cHit, percent);
+      string summaryFilepath = $"{Dir}/HTML/Summary.html";
+      GenerateOutputSummary (summaryFilepath, summary, overall);
+      Process.Start (new ProcessStartInfo (summaryFilepath) { UseShellExecute = true });
+
+      int FirstValidIdx (string str) => str.TakeWhile (char.IsWhiteSpace).Count ();
+      int LastValidIdx (string str) => str.Length - str.Reverse ().TakeWhile (char.IsWhiteSpace).Count ();
    }
+
+   void GenerateOutputSummary(string outputFilePath, List<(string htmlFile, string csFilename, int hit, int total, double percentageHit)> coverageDetails, (int totalBlocks, int totalBlocksHit, double percentageHit) overall) {
+      string html = $$""" 
+      <html><head><title>Coverage Summary</title>
+      <link rel="stylesheet" type="text/css" href="{{Dir}}/styles/tables.css" />
+      <style>a { color: blue; }</style>
+      </head>
+      <body><pre>
+      <div>
+      <h2 style="margin: 0px">Overall summary</h2>
+      <table>
+         <tr>
+            <td>Total blocks hit</td>
+            <td>{{overall.totalBlocksHit}}/{{overall.totalBlocks}}</td>
+         </tr>
+         <tr>
+            <td>Total coverage percentage</td>
+            <td>{{overall.percentageHit}} % {{GetCoverageRating (overall.percentageHit)}}</td>
+         </tr>
+      </table>
+      </div>
+      <div>
+      <h2 style="margin: 0px">File specific summary</h2>
+      <table>
+         <tr>
+            <th>Filename</th>
+            <th>Blocks hit</th>
+            <th>Coverage percentage</th>
+         </tr>
+         {{string.Join("\r\n", coverageDetails.OrderBy (d => d.percentageHit).Select(detail => $"""
+         <tr><td><a href="{detail.htmlFile}">{detail.csFilename}</a></td>
+            <td>{detail.hit}/{detail.total}</td>
+            <td>{detail.percentageHit} % {GetCoverageRating (detail.percentageHit)}</td></tr>
+         """))}}
+      </table>
+      </div>
+      </pre></body></html>
+      """;
+      File.WriteAllText (outputFilePath, html);
+   }
+
+   string GetCoverageRating (double percent) => percent switch {
+      (>= 90.0) => "(Exemplary)",
+      (>= 75.0) => "(Commendable)",
+      (>= 60.0) => "(Acceptable)",
+      _ => "(Critical)"
+   };
 
    // Restore the DLLs and PDBs from the backups
    void RestoreBackup (string module) {
@@ -235,7 +319,7 @@ class Block {
 
 static class Program {
    public static void Main () {
-      var analyzer = new Analyzer ("P:/Bin", "PSITest.exe", "parser.dll");
+      var analyzer = new Analyzer ("D:/Work/PascalCompiler/Bin", "PSITest.exe", "parser.dll");
       analyzer.Run ();
    }
 }

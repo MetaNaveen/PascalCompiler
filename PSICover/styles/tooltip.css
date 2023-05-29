@@ -1,0 +1,74 @@
+﻿/* Tooltip */
+.tooltip {
+   position: relative;
+}
+
+.tooltip::before,
+.tooltip::after {
+   display: block;
+   opacity: 0;
+   pointer-events: none;
+   position: absolute;
+   z-index: 1;
+}
+
+.tooltip::after { /* Tooltip pointer */
+   border-left: 6px solid transparent;
+   border-right: 6px solid transparent;
+   border-bottom: 6px solid rgba(0,0,0,.75);
+   content: '';
+   height: 0;
+   top: 20px;
+   left: 0px;
+   width: 0;
+}
+
+.tooltip::before { /* Tooltip body */
+   background: rgba(0,0,0,.75);
+   border-radius: 2px;
+   color: #fff;
+   content: attr(data-title);
+   font-size: 14px;
+   padding: 6px 10px;
+   top: 25px;
+   left: 0px;
+   white-space: nowrap;
+}
+
+.tooltip.animate::before {
+   transform: scale(.5,.5);
+   transition: all .3s ease-in-out;
+}
+
+.tooltip.animate:hover::before,
+.tooltip.animate:hover::after {
+   opacity: 1;
+   transform: scale(1,1);
+}
+
+/* Blocks Hit/Unhit */
+.hit {
+   background-color: lightgreen;
+}
+
+.unhit {
+   background-color: lightcoral;
+}
+
+.hit:hover {
+   cursor: pointer;
+   background-color: #53b407;
+}
+
+.unhit:hover {
+   cursor: pointer;
+   background-color: #e43708;
+}
+
+.tooltip:hover > .hit {
+   background-color: #53b407;
+}
+
+.tooltip:hover > .unhit {
+   background-color: #e43708;
+}

@@ -1,0 +1,26 @@
+﻿table {
+   width: 100%;
+   border-spacing: 0px;
+}
+
+td {
+   word-break: break-all;
+}
+
+td:first-child {
+   background-color: lightgray;
+}
+
+td:nth-child(2) {
+   background-color: gray;
+}
+
+td:last-child {
+   background-color: cornflowerblue;
+   width: 30%;
+   font-weight: bolder;
+}
+
+tr:hover td {
+   background-color: floralwhite !important;
+}

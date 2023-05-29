@@ -8,4 +8,13 @@
     <OutDir>../bin</OutDir>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Update="styles\tables.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="styles\tooltip.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
