@@ -66,8 +66,23 @@ public class ILCodeGen : Visitor {
       }
       if (w.NewLine) Out ("    call void [System.Console]System.Console::WriteLine ()");
    }
-   
-   public override void Visit (NIfStmt f) => throw new NotImplementedException ();
+
+   public override void Visit (NIfStmt f) {
+      string ifCondLbl = NextLabel (), ifThenLbl = NextLabel (), dummyLbl = NextLabel ();
+      Out ($"  {ifCondLbl}:");
+      f.Condition.Accept (this);
+      if (f.ElsePart == null) Out ($"    brfalse {dummyLbl}");
+      else { 
+         Out ($"    brtrue {ifThenLbl}");
+         Out ($"  {NextLabel ()}:");
+         f.ElsePart.Accept (this);
+         Out ($"    br {dummyLbl}");
+      } 
+      Out ($"  {ifThenLbl}:");
+      f.IfPart.Accept (this);
+      Out ($"  {dummyLbl}: nop");
+   }
+
    public override void Visit (NForStmt f) => throw new NotImplementedException ();
    public override void Visit (NReadStmt r) => throw new NotImplementedException ();
 
@@ -121,7 +136,7 @@ public class ILCodeGen : Visitor {
    public override void Visit (NUnary u) {
       u.Expr.Accept (this);
       string op = u.Op.Kind.ToString ().ToLower ();
-      op = op switch { "sub" => "neg", _ => op };
+      op = op switch { "sub" => "neg", "not" => "ldc.i4.1 xor", _ => op };
       Out ($"    {op}");
    }
 
@@ -131,7 +146,7 @@ public class ILCodeGen : Visitor {
          Out ("    call string [System.Runtime]System.String::Concat (string, string)");
       else {
          string op = b.Op.Kind.ToString ().ToLower ();
-         op = op switch { "mod" => "rem", "eq" => "ceq", "lt" => "clt", _ => op };
+         op = op switch { "mod" => "rem", "eq" => "ceq", "lt" => "clt", "geq" => "clt ldc.i4.0 ceq", "leq" => "cgt ldc.i4.0 ceq", "gt" => "cgt", "neq" => "ceq ldc.i4.0 ceq", _ => op };
          Out ($"    {op}");
       }
    }
