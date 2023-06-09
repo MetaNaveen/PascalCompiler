@@ -104,7 +104,7 @@ public record NRepeatStmt (NStmt[] Stmts, NExpr Condition) : NStmt {
 }
 
 // Read statement
-public record NReadStmt (Token[] Vars) : NStmt {
+public record NReadStmt (bool HasMultipleIdents, Token[] Vars) : NStmt {
    public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
    public override void Accept (Visitor visitor) => visitor.Visit (this);
 }

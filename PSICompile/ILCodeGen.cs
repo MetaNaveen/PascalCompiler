@@ -2,6 +2,7 @@
 // ILCodeGen.cs : Compiles a PSI parse tree to IL
 // ─────────────────────────────────────────────────────────────────────────────
 using System.Text;
+
 namespace PSI;
 using static NType;
 
@@ -129,10 +130,25 @@ public class ILCodeGen : Visitor {
       LoadVar (f.Var);
       f.End.Accept (this);
       Out (f.Ascending ? "    cgt" : "    clt");
+
       Out ($"    brfalse {labl1}");
    }
 
-   public override void Visit (NReadStmt r) => throw new NotImplementedException ();
+   public override void Visit (NReadStmt r) {
+      foreach (var v in r.Vars) {
+         var vd = mSymbols.Find (v) as NVarDecl;
+         Out ($"    call string [System.Console]System.Console::ReadLine()");
+         Out (vd.Type switch {
+            Integer => $"    call {TMap[vd.Type]} [System.Runtime]System.Convert::ToInt32(string)",
+            Real => $"    call {TMap[vd.Type]} [System.Runtime]System.Convert::ToDouble(string)",
+            Bool => $"    call {TMap[vd.Type]} [System.Runtime]System.Convert::ToBoolean(string)",
+            Char => $"    ldc.i4.0\n    callvirt instance {TMap[vd.Type]} [System.Runtime]System.String::get_Chars(int32)",
+            String => "    nop",
+            _ => throw new NotImplementedException ()
+         });
+         StoreVar (v);
+      }
+   }
 
    public override void Visit (NWhileStmt w) {
       string lab1 = NextLabel (), lab2 = NextLabel ();

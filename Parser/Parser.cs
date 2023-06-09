@@ -85,9 +85,9 @@ public class Parser {
       };
    }
    #endregion
-   
+
    #region Statements ---------------------------------------
-   // statement         =  write-stmt | read-stmt | assign-stmt | call-stmt |
+   // statement         =  write-stmt | read-stmt | readln-stmt | assign-stmt | call-stmt |
    //                      goto-stmt | if-stmt | while-stmt | repeat-stmt |
    //                      compound-stmt | for-stmt | case-stmt
    NStmt Stmt () {
@@ -99,7 +99,7 @@ public class Parser {
       if (Match (IF)) return IfStmt ();
       if (Match (FOR)) return ForStmt ();
       if (Peek (BEGIN)) return CompoundStmt ();
-      if (Match (READ)) return ReadStmt ();
+      if (Match (READ, READLN)) return ReadLnStmt ((Prev.Kind == READLN ? true: false));
       if (Match (WHILE)) return WhileStmt ();
       if (Match (REPEAT)) return RepeatStmt ();
       Unexpected ();
@@ -133,14 +133,15 @@ public class Parser {
       return new (name, start, ascending, end, Stmt ());
    }
 
-   // read-stmt = "read" "(" varlist ")" .
-   NReadStmt ReadStmt () {
+   // read-stmt = "read" "(" ident-list ")" .
+   // readln-stmt = "readln" "(" IDENT ")" .
+   NReadStmt ReadLnStmt (bool hasMultipleIdents) {
       var names = new List<Token> ();
       Expect (OPEN);
       if (!Peek (CLOSE)) names.Add (Expect (IDENT));
-      while (Match (COMMA)) names.Add (Expect (IDENT));
+      if(hasMultipleIdents) while (Match (COMMA)) names.Add (Expect (IDENT));
       Expect (CLOSE); Expect (SEMI);
-      return new (names.ToArray ());
+      return new (hasMultipleIdents, names.ToArray ());
    }
 
    // while-stmt = "while" condition "do" statement ";" .
