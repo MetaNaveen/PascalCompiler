@@ -22,6 +22,7 @@ public abstract class Visitor<T> {
    public abstract T Visit (NRepeatStmt r);
    public abstract T Visit (NCallStmt c);
    public abstract T Visit (NBreakStmt b);
+   public abstract T Visit (NContinueStmt b);
 
    public abstract T Visit (NLiteral t);
    public abstract T Visit (NIdentifier d);
@@ -50,6 +51,8 @@ public abstract class Visitor {
    public abstract void Visit (NRepeatStmt r);
    public abstract void Visit (NCallStmt c);
    public abstract void Visit (NBreakStmt b);
+   public abstract void Visit (NContinueStmt b);
+
 
    public abstract void Visit (NLiteral t);
    public abstract void Visit (NIdentifier d);

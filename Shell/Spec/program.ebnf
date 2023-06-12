@@ -13,7 +13,7 @@ func-decl         =  "function" IDENT paramlist ":" type; block ";" .
 paramlist         =  "(" var-decl { "," var-decl } ")"
 
 statement         =  write-stmt | read-stmt | readln-stmt | assign-stmt | call-stmt |
-                     if-stmt | while-stmt | repeat-stmt | compound-stmt | for-stmt 
+                     if-stmt | while-stmt | repeat-stmt | compound-stmt | for-stmt | break-stmt | continue-stmt
 write-stmt        =  ( "writeln" | "write" ) arglist .
 read-stmt         =  "read" "(" IDENT ")" .
 readln-stmt       =  "readln" "(" ident-list ")" .
@@ -25,6 +25,7 @@ repeat-stmt       =  "repeat" statement { ";" statement } "until" expression .
 compound-stmt     =  "begin" [ statement { ";" statement } ] "end" .
 for-stmt          =  "for" IDENT ":=" expression ( "to" | "downto" ) expression "do" statement .
 break-stmt        =  "break" [INTEGER] ";".
+continue-stmt     =  "continue;"
 
 expression        =  equality .
 equality          =  comparison [ ( "=" | "<>" ) comparison ] .

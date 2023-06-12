@@ -132,6 +132,7 @@ public class ILCodeGen : Visitor {
       Out ($"    br {labl2}");
       Out ($"   {labl1}:");
       f.Body.Accept (this);
+      Out ($"  {mLoopLevelList[^1]}_Continue:");
       LoadVar (f.Var);
       Out ($"    ldc.i4.1");
       Out (f.Ascending ? "    add" : "    sub");
@@ -162,14 +163,16 @@ public class ILCodeGen : Visitor {
 
    public override void Visit (NBreakStmt b) => Out ($"    br {mLoopLevelList[^(b.BreakLevel == 0 ? 1 : b.BreakLevel)]}");
 
+   public override void Visit (NContinueStmt b) => Out ($"    br {mLoopLevelList[^1]}_Continue");
+
    public override void Visit (NWhileStmt w) {
       string lab1 = NextLabel (), lab2 = NextLabel ();
       LoopEntry ();
-      mLoopLevelList.Add (NextLabel ());
       Out ($"    br {lab2}");
       Out ($"  {lab1}:");
       w.Body.Accept (this);
       Out ($"  {lab2}:");
+      Out ($"  {mLoopLevelList[^1]}_Continue:");
       w.Condition.Accept (this);
       Out ($"    brtrue {lab1}");
       LoopExit ();
@@ -180,6 +183,7 @@ public class ILCodeGen : Visitor {
       LoopEntry ();
       Out ($"  {lab}:");
       Visit (r.Stmts);
+      Out ($"  {mLoopLevelList[^1]}_Continue:");
       r.Condition.Accept (this);
       Out ($"    brfalse {lab}");
       LoopExit ();

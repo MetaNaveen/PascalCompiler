@@ -100,6 +100,7 @@ public class Parser {
       if (Match (FOR)) return ForStmt ();
       if (Peek (BEGIN)) return CompoundStmt ();
       if (Match (READ, READLN)) return ReadLnStmt ((Prev.Kind == READLN ? true: false));
+      if (Match (CONTINUE)) return ContinueStmt ();
       if (Match (WHILE)) return WhileStmt ();
       if (Match (REPEAT)) return RepeatStmt ();
       if (Match (BREAK)) return BreakStmt ();
@@ -169,6 +170,11 @@ public class Parser {
       }
       Expect (SEMI);
       return new NBreakStmt (token, level);
+   }
+
+   NContinueStmt ContinueStmt () {
+      Expect (SEMI);
+      return new NContinueStmt (Prev);
    }
 
    // write-stmt =  ( "writeln" | "write" ) "(" arglist ")" .

@@ -109,8 +109,13 @@ class TypeAnalyze : Visitor<NType> {
 
 
    public override NType Visit (NBreakStmt b) {
-      if (LoopDepth == 0) throw new ParseException (b.Token, "Expected loop for break.");
+      if (LoopDepth == 0) throw new ParseException (b.Token, "Expected a loop for break.");
       if (b.BreakLevel > LoopDepth) throw new ParseException (b.Token, "Break loop-depth exceeded.");
+      return Void;
+   }
+
+   public override NType Visit (NContinueStmt b) {
+      if (LoopDepth == 0) throw new ParseException (b.Token, "Expected a loop for continue.");
       return Void;
    }
 
