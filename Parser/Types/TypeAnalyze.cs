@@ -6,6 +6,8 @@ using static NType;
 using static Token.E;
 
 class TypeAnalyze : Visitor<NType> {
+
+   public int LoopDepth = 0;
    #region Declarations ------------------------------------
    public override NType Visit (NProgram p) 
       => Visit (p.Block);
@@ -89,21 +91,28 @@ class TypeAnalyze : Visitor<NType> {
    public override NType Visit (NForStmt f) {
       var v = ExpectVar (f.Var);
       if (v.Type != Integer) Fatal (f.Var, "For loop variable must be an integer");
-      v.Assigned = true; 
+      LoopDepth++;
+      v.Assigned = true;
       f.Start = AddTypeCast (f.Start, v.Type);
       f.End = AddTypeCast (f.End, v.Type);
       f.Body.Accept (this);
+      LoopDepth--;
       return Void;
    }
 
    public override NType Visit (NReadStmt r) {
+      if (r.Vars.Count () == 0) throw new ParseException (r.Token, "Read statment expects atleast one variable.");
       foreach (var name in r.Vars) 
          ExpectVar (name).Assigned = true; 
       return Void;
    }
 
 
-   public override NType Visit (NBreakStmt b) => Void;
+   public override NType Visit (NBreakStmt b) {
+      if (LoopDepth == 0) throw new ParseException (b.Token, "Expected loop for break.");
+      if (b.BreakLevel > LoopDepth) throw new ParseException (b.Token, "Break loop-depth exceeded.");
+      return Void;
+   }
 
    NVarDecl ExpectVar (Token name) {
       switch (mSymbols.Find (name)) {
@@ -114,14 +123,18 @@ class TypeAnalyze : Visitor<NType> {
    }
 
    public override NType Visit (NWhileStmt w) {
+      LoopDepth++;
       w.Condition = AddTypeCast (w.Condition, Bool);
       w.Body.Accept (this);
+      LoopDepth--;
       return Void; 
    }
 
    public override NType Visit (NRepeatStmt r) {
+      LoopDepth++;
       Visit (r.Stmts);
       r.Condition = AddTypeCast (r.Condition, Bool);
+      LoopDepth--;
       return Void;
    }
 

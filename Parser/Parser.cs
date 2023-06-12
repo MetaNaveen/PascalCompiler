@@ -137,12 +137,13 @@ public class Parser {
    // read-stmt = "read" "(" ident-list ")" .
    // readln-stmt = "readln" "(" IDENT ")" .
    NReadStmt ReadLnStmt (bool hasMultipleIdents) {
+      Token token = Prev;
       var names = new List<Token> ();
       Expect (OPEN);
       if (!Peek (CLOSE)) names.Add (Expect (IDENT));
       if(hasMultipleIdents) while (Match (COMMA)) names.Add (Expect (IDENT));
       Expect (CLOSE); Expect (SEMI);
-      return new (hasMultipleIdents, names.ToArray ());
+      return new (token, hasMultipleIdents, names.ToArray ());
    }
 
    // while-stmt = "while" condition "do" statement ";" .
@@ -163,8 +164,8 @@ public class Parser {
       Token token = Prev;
       int level = 0;
       if (Peek (L_INTEGER)) {
-         var t = Expect (L_INTEGER);
-         level = int.Parse (t.Text);
+         token = Expect (L_INTEGER);
+         level = int.Parse (token.Text);
       }
       Expect (SEMI);
       return new NBreakStmt (token, level);
