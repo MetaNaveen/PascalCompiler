@@ -161,6 +161,7 @@ public class ILCodeGen : Visitor {
    }
 
    public override void Visit (NBreakStmt b) {
+      if (mLoopLevelList.Count == 0) throw new ParseException (b.Token, "Expected loop for break");
       if (b.BreakLevel > mLoopLevelList.Count) throw new ParseException (b.Token, "Break loop-depth exceeded!");
       Out ($"    br {mLoopLevelList[^(b.BreakLevel == 0 ? 1: b.BreakLevel)]}");
    }
