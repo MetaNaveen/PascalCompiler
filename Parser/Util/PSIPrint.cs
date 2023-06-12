@@ -164,5 +164,8 @@ public class PSIPrint : Visitor<StringBuilder> {
       return S;
    }
 
+   public override StringBuilder Visit (NBreakStmt b) 
+      => NWrite (b.BreakLevel > 0 ? $"break {b.BreakLevel};" : "break;");
+
    readonly StringBuilder S = new ();
 }

@@ -9,6 +9,15 @@ using static NType;
 public class ILCodeGen : Visitor {
    // Generated code is gathered heres
    public readonly StringBuilder S = new ();
+   public readonly List<string> mLoopLevelList = new ();
+
+   public void LoopEntry() => mLoopLevelList.Add (NextLabel ());
+   public string LoopExit() {
+      string loopExitLbl = mLoopLevelList[mLoopLevelList.Count - 1];
+      Out ($"    {loopExitLbl}:");
+      mLoopLevelList.Remove (loopExitLbl);
+      return loopExitLbl;
+   }
 
    public override void Visit (NProgram p) {
       Out (".assembly extern System.Runtime { .publickeytoken = (B0 3F 5F 7F 11 D5 0A 3A) .ver 7:0:0:0 }");
@@ -29,7 +38,7 @@ public class ILCodeGen : Visitor {
    }
    SymTable mSymbols = SymTable.Root;
 
-   public override void Visit (NBlock b) { 
+   public override void Visit (NBlock b) {
       b.Declarations.Accept (this);
       b.Body.Accept (this);
    }
@@ -85,7 +94,7 @@ public class ILCodeGen : Visitor {
             else if (vd.Argument) Out ($"    starg {vd.Name}");
             else Out ($"    stsfld {type} Program::{vd.Name}");
             break;
-      } 
+      }
    }
 
    void LoadVar (Token name) {
@@ -115,8 +124,9 @@ public class ILCodeGen : Visitor {
       Out ($"   {labl2}:");
    }
 
-   public override void Visit (NForStmt f) { 
+   public override void Visit (NForStmt f) {
       string labl1 = NextLabel (), labl2 = NextLabel ();
+      LoopEntry ();
       f.Start.Accept (this);
       StoreVar (f.Var);
       Out ($"    br {labl2}");
@@ -130,8 +140,8 @@ public class ILCodeGen : Visitor {
       LoadVar (f.Var);
       f.End.Accept (this);
       Out (f.Ascending ? "    cgt" : "    clt");
-
       Out ($"    brfalse {labl1}");
+      LoopExit ();
    }
 
    public override void Visit (NReadStmt r) {
@@ -150,22 +160,32 @@ public class ILCodeGen : Visitor {
       }
    }
 
+   public override void Visit (NBreakStmt b) {
+      if (b.BreakLevel > mLoopLevelList.Count) throw new ParseException (b.Token, "Break loop-depth exceeded!");
+      Out ($"    br {mLoopLevelList[^(b.BreakLevel == 0 ? 1: b.BreakLevel)]}");
+   }
+
    public override void Visit (NWhileStmt w) {
       string lab1 = NextLabel (), lab2 = NextLabel ();
+      LoopEntry ();
+      mLoopLevelList.Add (NextLabel ());
       Out ($"    br {lab2}");
       Out ($"  {lab1}:");
       w.Body.Accept (this);
       Out ($"  {lab2}:");
       w.Condition.Accept (this);
       Out ($"    brtrue {lab1}");
+      LoopExit ();
    }
 
    public override void Visit (NRepeatStmt r) {
       string lab = NextLabel ();
+      LoopEntry ();
       Out ($"  {lab}:");
       Visit (r.Stmts);
       r.Condition.Accept (this);
       Out ($"    brfalse {lab}");
+      LoopExit ();
    }
    string NextLabel () => $"IL_{++mLabel:D4}";
    int mLabel;

@@ -102,6 +102,9 @@ class TypeAnalyze : Visitor<NType> {
       return Void;
    }
 
+
+   public override NType Visit (NBreakStmt b) => Void;
+
    NVarDecl ExpectVar (Token name) {
       switch (mSymbols.Find (name)) {
          case NVarDecl v: return v;
